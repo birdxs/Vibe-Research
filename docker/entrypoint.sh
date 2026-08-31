@@ -11,9 +11,9 @@ export VRA_DATA_ROOT="${VRA_DATA_ROOT:-/data}"
 
 mkdir -p /data
 
-# 启动后端 API（后台）
+# 启动后端 API（后台）—— Node 22 需要 --experimental-strip-types 运行 .ts 文件
 cd /app
-node orchestrator/src/api.ts --port 8765 --host 0.0.0.0 &
+node --experimental-strip-types orchestrator/src/api.ts --port 8765 --host 0.0.0.0 &
 BACKEND_PID=$!
 
 # 等待后端就绪

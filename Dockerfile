@@ -8,11 +8,11 @@ FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app
 
-COPY desktop/package.json desktop/package-lock.json* ./
-RUN npm install --prefix desktop --legacy-peer-deps
-
-COPY desktop/ ./desktop/
-RUN npm run build --prefix desktop
+COPY desktop/package.json desktop/package-lock.json* ./desktop/
+WORKDIR /app/desktop
+RUN npm install --legacy-peer-deps
+COPY desktop/ ./
+RUN npm run build
 
 # ── 阶段2: 最终运行镜像 ──
 FROM node:22-slim AS runtime
@@ -30,8 +30,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Node.js 依赖
-COPY orchestrator/package.json orchestrator/package-lock.json* ./
-RUN npm install --prefix orchestrator --legacy-peer-deps
+COPY orchestrator/package.json orchestrator/package-lock.json* ./orchestrator/
+WORKDIR /app/orchestrator
+RUN npm install
+WORKDIR /app
 
 # Python venv
 RUN python3 -m venv /app/.venv
@@ -50,8 +52,8 @@ COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# 初始化
-RUN node orchestrator/src/init.ts --python /app/.venv/bin/python 2>/dev/null || true
+# 初始化（Node 22 需要 --experimental-strip-types 运行 .ts 文件）
+RUN node --experimental-strip-types orchestrator/src/init.ts --python /app/.venv/bin/python 2>/dev/null || true
 
 RUN mkdir -p /data
 ENV VRA_DATA_ROOT=/data
