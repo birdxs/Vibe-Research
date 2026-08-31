@@ -1,19 +1,20 @@
 # Vibe-Research v1.0 Docker Compose
 # 使用方式：
-#   export GHCR_IMAGE=ghcr.io/your-username/vibe-research:latest
 #   docker compose up -d
 
 services:
   vibe-research:
-    image: ${GHCR_IMAGE:-ghcr.io/your-username/vibe-research:latest}
-    container_name: vibe-research
+    image: birdxs/vibe-research:latest
+    container_name: vibe-research-v2
     restart: unless-stopped
     ports:
-      - "5899:80"
+      - "5898:80"
     environment:
       - VRA_DATA_ROOT=/data
+      - VRA_API_TOKEN=fdf2c8356f52b9be8561bfe601a50e38
+      - VRA_ALLOWED_ORIGINS=https://vibe-research-v2.birdxs.fun:89
     volumes:
-      - vibe-data:/data
+      - ./vibe-data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
       interval: 30s
@@ -21,6 +22,9 @@ services:
       retries: 3
       start_period: 15s
 
-volumes:
-  vibe-data:
-    driver: local
+    networks:
+      - 1panel-network
+
+networks:
+  1panel-network:
+    external: true

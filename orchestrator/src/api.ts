@@ -110,10 +110,15 @@ function readBody(req: http.IncomingMessage, max = MAX_BODY): Promise<Record<str
   });
 }
 
-/** 浏览器跨站防护:带 Origin 的请求只接受本机来源;POST 必须是 application/json(浏览器表单 / text/plain 的无预检请求一律拒绝) */
+/** 浏览器跨站防护:带 Origin 的请求只接受本机来源或 VRA_ALLOWED_ORIGINS 白名单;POST 必须是 application/json(浏览器表单 / text/plain 的无预检请求一律拒绝) */
+const LOCALHOST_RE = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/;
+const EXTRA_ORIGINS: readonly string[] = (process.env.VRA_ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 function crossSiteReject(req: http.IncomingMessage): { code: number; error: string } | null {
   const origin = req.headers.origin;
-  if (origin !== undefined && !/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(String(origin))) return { code: 403, error: "forbidden_origin" };
+  if (origin !== undefined) {
+    const ok = LOCALHOST_RE.test(String(origin)) || EXTRA_ORIGINS.includes(String(origin));
+    if (!ok) return { code: 403, error: "forbidden_origin" };
+  }
   const sfs = req.headers["sec-fetch-site"];
   if (sfs && sfs !== "same-origin" && sfs !== "none") return { code: 403, error: "forbidden_cross_site" };
   if (req.method === "POST" && !String(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) return { code: 415, error: "content_type_must_be_json" };
