@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-venv \
     python3-pip \
     curl \
+    gettext-base \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /dev/stdout /var/log/nginx/access.log \
     && ln -sf /dev/stderr /var/log/nginx/error.log
@@ -53,8 +54,8 @@ COPY . .
 # 前端构建产物
 COPY --from=frontend-builder /app/desktop/dist /usr/share/nginx/html
 
-# 配置文件
-COPY docker/nginx.conf /etc/nginx/nginx.conf
+# nginx 配置模板（entrypoint 用 envsubst 注入 API token）
+COPY docker/nginx.conf /etc/nginx/nginx.conf.template
 COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
@@ -68,6 +69,6 @@ ENV VRA_PYTHON=/app/.venv/bin/python
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost/api/health || exit 1
+    CMD curl -sf http://localhost/api/health || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]

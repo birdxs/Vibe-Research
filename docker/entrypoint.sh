@@ -1,5 +1,5 @@
 #!/bin/bash
-# 不用 set -e，手动处理错误，避免后台进程检查被误杀
+# 不用 set -e，手动处理错误
 
 echo "==> Starting Vibe-Research v1.0.1..."
 echo "    Frontend: http://0.0.0.0:80"
@@ -11,7 +11,7 @@ export VRA_DATA_ROOT="${VRA_DATA_ROOT:-/data}"
 
 mkdir -p /data
 
-# 启动后端 API（后台）—— Node 22 需要 --experimental-strip-types 运行 .ts 文件
+# 启动后端 API（后台）
 cd /app
 node --experimental-strip-types orchestrator/src/api.ts --port 8765 --host 0.0.0.0 &
 BACKEND_PID=$!
@@ -21,11 +21,6 @@ echo "==> Backend PID: $BACKEND_PID"
 echo "==> Waiting for backend to start..."
 READY=0
 for i in $(seq 1 60); do
-    # 带 Bearer token 健康检查（VRA_API_TOKEN 已设置时 API 需要认证）
-    AUTH_HEADER=""
-    if [ -n "$VRA_API_TOKEN" ]; then
-        AUTH_HEADER="-H \"Authorization: Bearer $VRA_API_TOKEN\""
-    fi
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
         ${VRA_API_TOKEN:+-H "Authorization: Bearer $VRA_API_TOKEN"} \
         http://127.0.0.1:8765/health 2>/dev/null || true)
@@ -34,11 +29,9 @@ for i in $(seq 1 60); do
         READY=1
         break
     fi
-    # 每 10 秒打一次进度
     if [ $((i % 10)) -eq 0 ]; then
         echo "==> Still waiting... ($i/60, last HTTP: $HTTP_CODE)"
     fi
-    # 检查后端进程是否还活着
     if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
         echo "==> ERROR: Backend process (PID $BACKEND_PID) died unexpectedly"
         exit 1
@@ -52,6 +45,21 @@ if [ "$READY" -ne 1 ]; then
     exit 1
 fi
 
-# nginx 前台运行（阻塞容器，容器退出时 nginx 也停）
+# 读取 API token 并注入到 nginx 配置
+# API 启动时已创建 .local/api.token，从中读取用于代理认证
+NGINX_API_TOKEN=""
+TOKEN_FILE="/data/api.token"
+if [ -f "$TOKEN_FILE" ]; then
+    NGINX_API_TOKEN=$(cat "$TOKEN_FILE" | tr -d '[:space:]')
+    echo "==> API token loaded for nginx proxy (${#NGINX_API_TOKEN} chars)"
+else
+    echo "==> WARNING: $TOKEN_FILE not found, API proxy may fail without auth"
+fi
+export NGINX_API_TOKEN
+
+# 生成 nginx 配置（注入 API token）
+envsubst '${NGINX_API_TOKEN}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+
+# nginx 前台运行
 echo "==> Starting nginx..."
 exec nginx -g 'daemon off;'
