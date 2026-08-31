@@ -45,15 +45,24 @@ if [ "$READY" -ne 1 ]; then
     exit 1
 fi
 
-# 读取 API token 并注入到 nginx 配置
-# API 启动时已创建 .local/api.token，从中读取用于代理认证
-NGINX_API_TOKEN=""
-TOKEN_FILE="/data/api.token"
-if [ -f "$TOKEN_FILE" ]; then
-    NGINX_API_TOKEN=$(cat "$TOKEN_FILE" | tr -d '[:space:]')
-    echo "==> API token loaded for nginx proxy (${#NGINX_API_TOKEN} chars)"
+# 注入 API token 到 nginx 配置
+# 优先用环境变量 VRA_API_TOKEN（用户设置的），否则尝试从 api.token 文件读取
+NGINX_API_TOKEN="${VRA_API_TOKEN:-}"
+if [ -z "$NGINX_API_TOKEN" ]; then
+    # 尝试从多个可能的位置读取 token 文件
+    for f in "/data/api.token" "/app/.local/api.token" "/app/api.token"; do
+        if [ -f "$f" ]; then
+            NGINX_API_TOKEN=$(cat "$f" | tr -d '[:space:]')
+            echo "==> API token loaded from $f (${#NGINX_API_TOKEN} chars)"
+            break
+        fi
+    done
+fi
+
+if [ -n "$NGINX_API_TOKEN" ]; then
+    echo "==> API token configured for nginx proxy (${#NGINX_API_TOKEN} chars)"
 else
-    echo "==> WARNING: $TOKEN_FILE not found, API proxy may fail without auth"
+    echo "==> WARNING: No API token found, API proxy may fail"
 fi
 export NGINX_API_TOKEN
 
