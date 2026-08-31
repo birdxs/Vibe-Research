@@ -21,14 +21,20 @@ echo "==> Backend PID: $BACKEND_PID"
 echo "==> Waiting for backend to start..."
 READY=0
 for i in $(seq 1 60); do
-    if curl -sf http://127.0.0.1:8765/health > /dev/null 2>&1; then
-        echo "==> Backend is ready!"
+    # 直接用 HTTP 状态码判断，不用 -f 参数（避免 set -e 问题）
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8765/health 2>/dev/null || true)
+    if [ "$HTTP_CODE" = "200" ]; then
+        echo "==> Backend is ready! (HTTP $HTTP_CODE)"
         READY=1
         break
     fi
+    # 每 10 秒打一次进度
+    if [ $((i % 10)) -eq 0 ]; then
+        echo "==> Still waiting... ($i/60, last HTTP: $HTTP_CODE)"
+    fi
     # 检查后端进程是否还活着
     if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-        echo "==> ERROR: Backend process died unexpectedly"
+        echo "==> ERROR: Backend process (PID $BACKEND_PID) died unexpectedly"
         exit 1
     fi
     sleep 1
