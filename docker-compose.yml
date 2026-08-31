@@ -1,0 +1,23 @@
+# Vibe-Research v1.0 Docker Compose
+
+services:
+  vibe-research:
+    image: ${GHCR_IMAGE:-ghcr.io/your-username/vibe-research:latest}
+    container_name: vibe-research
+    restart: unless-stopped
+    ports:
+      - "5899:80"
+    environment:
+      - VRA_DATA_ROOT=/data
+    volumes:
+      - vibe-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  vibe-data:
+    driver: local
