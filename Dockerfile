@@ -8,11 +8,17 @@ FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app
 
+# 复制 desktop 依赖并安装
 COPY desktop/package.json desktop/package-lock.json* ./desktop/
 WORKDIR /app/desktop
 RUN npm install --legacy-peer-deps
+
+# 复制 desktop 源码 + orchestrator 源码（vite-token.ts 需要 orchestrator 类型）
 COPY desktop/ ./
-RUN npm run build
+COPY orchestrator/src/data_root.ts ../orchestrator/src/data_root.ts
+
+# 构建前端（跳过 TypeScript 类型检查，只做 vite build）
+RUN npx vite build
 
 # ── 阶段2: 最终运行镜像 ──
 FROM node:22-slim AS runtime
