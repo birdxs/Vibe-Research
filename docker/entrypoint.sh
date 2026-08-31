@@ -21,8 +21,14 @@ echo "==> Backend PID: $BACKEND_PID"
 echo "==> Waiting for backend to start..."
 READY=0
 for i in $(seq 1 60); do
-    # 直接用 HTTP 状态码判断，不用 -f 参数（避免 set -e 问题）
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8765/health 2>/dev/null || true)
+    # 带 Bearer token 健康检查（VRA_API_TOKEN 已设置时 API 需要认证）
+    AUTH_HEADER=""
+    if [ -n "$VRA_API_TOKEN" ]; then
+        AUTH_HEADER="-H \"Authorization: Bearer $VRA_API_TOKEN\""
+    fi
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+        ${VRA_API_TOKEN:+-H "Authorization: Bearer $VRA_API_TOKEN"} \
+        http://127.0.0.1:8765/health 2>/dev/null || true)
     if [ "$HTTP_CODE" = "200" ]; then
         echo "==> Backend is ready! (HTTP $HTTP_CODE)"
         READY=1
