@@ -5,7 +5,7 @@
 ## 快速部署
 
 ```bash
-docker pull ghcr.io/birdxs/vibe-research:latest
+docker pull ghcr.io/your-username/vibe-research:latest
 
 docker run -d \
   --name vibe-research \
@@ -13,7 +13,7 @@ docker run -d \
   -v vibe-data:/data \
   -e VRA_DATA_ROOT=/data \
   -e VRA_API_TOKEN=$(openssl rand -hex 32) \
-  ghcr.io/birdxs/vibe-research:latest
+  ghcr.io/your-username/vibe-research:latest
 ```
 
 浏览器打开 http://localhost:5899
