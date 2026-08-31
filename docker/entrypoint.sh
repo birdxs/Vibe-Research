@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+# 不用 set -e，手动处理错误，避免后台进程检查被误杀
 
 echo "==> Starting Vibe-Research v1.0.1..."
 echo "    Frontend: http://0.0.0.0:80"
@@ -15,26 +15,31 @@ mkdir -p /data
 cd /app
 node --experimental-strip-types orchestrator/src/api.ts --port 8765 --host 0.0.0.0 &
 BACKEND_PID=$!
+echo "==> Backend PID: $BACKEND_PID"
 
 # 等待后端就绪
 echo "==> Waiting for backend to start..."
-for i in $(seq 1 30); do
+READY=0
+for i in $(seq 1 60); do
     if curl -sf http://127.0.0.1:8765/health > /dev/null 2>&1; then
         echo "==> Backend is ready!"
+        READY=1
         break
     fi
-    if ! kill -0 $BACKEND_PID 2>/dev/null; then
-        echo "==> Backend process died, exiting..."
-        exit 1
-    fi
-    if [ $i -eq 30 ]; then
-        echo "==> Backend failed to start, exiting..."
-        kill $BACKEND_PID 2>/dev/null
+    # 检查后端进程是否还活着
+    if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+        echo "==> ERROR: Backend process died unexpectedly"
         exit 1
     fi
     sleep 1
 done
 
-# nginx 前台运行
+if [ "$READY" -ne 1 ]; then
+    echo "==> ERROR: Backend failed to start within 60s"
+    kill "$BACKEND_PID" 2>/dev/null
+    exit 1
+fi
+
+# nginx 前台运行（阻塞容器，容器退出时 nginx 也停）
 echo "==> Starting nginx..."
 exec nginx -g 'daemon off;'
