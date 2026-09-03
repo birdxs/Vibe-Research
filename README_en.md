@@ -9,9 +9,9 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.1-F35D2B">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.3-F35D2B">
   <img alt="UI" src="https://img.shields.io/badge/UI-React%20%2B%20Vite-646cff">
-  <img alt="Orchestrator tests" src="https://img.shields.io/badge/orchestrator-539%20checks-passing">
+  <img alt="Orchestrator tests" src="https://img.shields.io/badge/orchestrator-540%20checks-passing">
   <img alt="Desktop tests" src="https://img.shields.io/badge/desktop-25%20tests-passing">
   <img alt="Codex Harness" src="https://img.shields.io/badge/runtime-Codex%20Harness-black">
 </p>
@@ -29,6 +29,14 @@
   <a href="#current-boundaries">Boundaries</a> ·
   <a href="CHANGELOG.md">CHANGELOG</a>
 </p>
+
+---
+
+## The Author Is Open to Opportunities
+
+The author is open to AI roles at Tencent and other leading technology companies in Shenzhen, and hopes to join a team passionate about AI development. Areas of interest include AI / Agent product development, real-world deployment, and AI consulting.
+
+Contact: [simonlin0423@gmail.com](mailto:simonlin0423@gmail.com)
 
 ---
 
@@ -101,6 +109,8 @@ model guesses.
 | Codex CLI | Version 0.149.0 verified; see `codex-version.json` |
 | Model access | ChatGPT or Claude.ai subscription login, or a provider that supports the Responses API |
 
+> Node must be a build with TypeScript support enabled (the official nodejs.org installers and anything installed via nvm / fnm / Volta are): `node -p process.features.typescript` should print `strip` or `transform`. Some Linux distribution packages ship Node compiled without it; starting the app or running tests then fails with `ERR_UNKNOWN_FILE_EXTENSION ".ts"` / `ERR_NO_TYPESCRIPT` — switch to an official build. `npm test` runs this check first and prints the same guidance.
+
 ### Install dependencies
 
 Windows (PowerShell or Command Prompt):
@@ -157,6 +167,7 @@ On Windows, `scripts\start.cmd` handles both processes. On macOS / Linux, open t
 
 ```bash
 # Terminal 1: local API
+node scripts/check-node.mjs   # optional runtime self-check, see the Node note above
 node orchestrator/src/api.ts --port 8765
 ```
 
