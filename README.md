@@ -9,9 +9,9 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.1-F35D2B">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.4-F35D2B">
   <img alt="UI" src="https://img.shields.io/badge/UI-React%20%2B%20Vite-646cff">
-  <img alt="Orchestrator tests" src="https://img.shields.io/badge/orchestrator-539%20checks-passing">
+  <img alt="Orchestrator tests" src="https://img.shields.io/badge/orchestrator-540%20checks-passing">
   <img alt="Desktop tests" src="https://img.shields.io/badge/desktop-25%20tests-passing">
   <img alt="Codex Harness" src="https://img.shields.io/badge/runtime-Codex%20Harness-black">
 </p>
@@ -29,6 +29,16 @@
   <a href="#当前边界">边界</a> ·
   <a href="CHANGELOG.md">CHANGELOG</a>
 </p>
+
+---
+
+## 寻找深圳的 AI 工作机会
+
+作者目前正在寻找深圳的 AI 相关工作机会，重点关注腾讯等大型科技企业及金融机构的 **AI 投研产品、FDE 与 AI 咨询 / 解决方案岗位**。
+
+兼具金融机构从业经历与 AI 产品实战，持续构建金融市场数据工具和多智能体系统，开源项目累计获得 **17K+ GitHub Stars**。
+
+联系：[simonlin0423@gmail.com](mailto:simonlin0423@gmail.com)
 
 ---
 
@@ -97,6 +107,8 @@ API 问答，长任务能力、工具使用、上下文保持和推理质量都�
 | Codex CLI | 已验证 0.149.0；版本锚点见 `codex-version.json` |
 | 模型 | ChatGPT / Claude.ai 订阅登录，或支持 Responses API 的模型服务 |
 
+> Node 必须是启用了 TypeScript 支持的构建（nodejs.org 官方安装包、nvm / fnm / Volta 装的都是）：`node -p process.features.typescript` 应输出 `strip` 或 `transform`。部分 Linux 发行版仓库打包的 Node 编译时关闭了这一项，启动或跑测试会报 `ERR_UNKNOWN_FILE_EXTENSION ".ts"` / `ERR_NO_TYPESCRIPT`，请换官方构建。`npm test` 前会先做这项检查并给出同样的提示。
+
 ### 安装依赖
 
 Windows（PowerShell / CMD）：
@@ -147,7 +159,8 @@ API 接入：进入“接入 AI”→“API 接入”，选择供应商并填写
 Windows 已由 `scripts\start.cmd` 一键启动。macOS / Linux 打开两个终端：
 
 ```bash
-# 终端 1：本地 API
+# 终端 1：本地 API（第一行是可选的运行时自检，见上文 Node 说明）
+node scripts/check-node.mjs
 node orchestrator/src/api.ts --port 8765
 ```
 
@@ -232,10 +245,15 @@ ChatGPT / Claude.ai 订阅 · OpenAI · DeepSeek · Qwen · GLM · Kimi · MiMo 
 - API 模式的 key 只保存在当前浏览器 `localStorage`，随请求交给本机后端，不写入仓库、配置文件、
   运行账本或日志。
 
-内置 provider 模板：OpenAI、DeepSeek、Qwen、GLM、Kimi、MiMo。引擎只支持 Responses API；
+内置 provider 模板：OpenAI、DeepSeek、Qwen、GLM、Kimi、MiMo，以及 `selfhosted` 自托管占位模板
+（vLLM / SGLang / LM Studio / Ollama 等 OpenAI 兼容端点，私有化部署走 §自托管模型）。引擎只支持 Responses API；
 模板存在不等于已经通过兼容矩阵，界面会区分“已实测”和“有模板、未实测”。
 
 详细说明见 [docs/model-access.md](docs/model-access.md) 和 [providers/README.md](providers/README.md)。
+
+**局域网访问（可选）**：默认只绑本机。想在一台常开的机器上跑、从同一局域网的其它设备打开，
+启动前设 `VRA_LAN=1`（`VRA_LAN=1 npm run dev`）：前端改绑 `0.0.0.0`，本机代理把 Origin 归一化为回环，
+后端的跨站防护不动。只建议在受信任的局域网内开启，不要把这个端口暴露到公网。
 
 ## 数据与市场
 

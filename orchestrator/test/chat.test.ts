@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import "../src/finance/register.ts"; // 测试文件也是入口:插件要先注册
-import { ChatError, chatSend, chatSessionCount, resetChatSessions, translateHeadlines } from "../src/chat.ts";
+import { ChatError, chatSend, chatSessionCount, llmProbe, resetChatSessions, translateHeadlines } from "../src/chat.ts";
 import { LocalAgentError } from "../src/local_agent_runtime.ts";
 import type { LlmOverride } from "../src/runtime_provider.ts";
 
@@ -74,10 +74,36 @@ test("对话线程的硬约束必须真的传给引擎:无本地工具 / 只读 
   assert.match(String(cap.codexOptions?.codexPathOverride), /codex(?:\.exe)?$/, "对话必须直接启动平台对应的官方引擎");
   assert.ok(!("VRA_CODEX_REAL_BIN" in ((cap.codexOptions?.env as Record<string, unknown>) ?? {})), "不能依赖 POSIX 包装器环境变量");
   assert.ok((cap.codexOptions?.configOverrides as string[]).some((x) => x.startsWith("mcp_servers=")), "对话轮必须用高优先级 MCP 隔离覆盖，不能靠会被递归合并的空表");
-  assert.ok((cap.codexOptions?.configOverrides as string[]).some((x) => /"session_evil"\s*=\s*\{\s*"enabled"\s*=\s*false/.test(x)), "对话必须用真实 session cwd 发现并禁用项目层 MCP");
+  assert.ok((cap.codexOptions?.configOverrides as string[]).every((x) => !x.includes("session_evil")), "未受信任、未生效的项目 MCP 不得被提升成缺 transport 的根配置");
   const skills = config.skills as { bundled?: { enabled?: boolean }; config?: { enabled?: boolean }[] };
   assert.equal(skills.bundled?.enabled, false, "对话线程不能加载捆绑 skill");
   assert.ok((skills.config ?? []).every((x) => x.enabled === false), "发现到的用户 skill 必须全部禁用");
+});
+
+test("MCP 隔离发现必须在产品 CODEX_HOME 下枚举 —— 用户全局 ~/.codex 的 MCP 不得混进对话覆盖（#44）", async () => {
+  resetChatSessions();
+  const cap: Cap = { prompts: [] };
+  const root = tmp();
+  // 伪造一个带全局 MCP 的用户主目录。codex ≥0.149 会把「线程 CODEX_HOME 里不存在、
+  // 却被投影成只含 enabled=false」的 server 判成 invalid transport，整轮对话直接失败。
+  const fakeHome = tmp();
+  fs.mkdirSync(path.join(fakeHome, ".codex"), { recursive: true });
+  fs.writeFileSync(path.join(fakeHome, ".codex", "config.toml"), '[mcp_servers.ghost_global]\ncommand = "ghost-bin"\nargs = ["mcp"]\nenabled = false\n');
+  const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE, CODEX_HOME: process.env.CODEX_HOME };
+  process.env.HOME = fakeHome;
+  process.env.USERPROFILE = fakeHome;
+  delete process.env.CODEX_HOME;
+  try {
+    await chatSend({ repoRoot: REPO, dataRoot: root, python: TEST_PYTHON }, { session: "t44", message: "你好" }, fakeCodex("好", cap));
+  } finally {
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
+  const overrides = cap.codexOptions?.configOverrides as string[];
+  const mcp = overrides.find((x) => x.startsWith("mcp_servers="));
+  assert.ok(mcp, "对话轮必须带 MCP 隔离覆盖");
+  assert.ok(!mcp.includes("ghost_global"), `全局 ~/.codex 的 MCP 不得进入对话覆盖：${mcp}`);
+  const env = cap.codexOptions?.env as Record<string, string>;
+  assert.ok(env.CODEX_HOME && !env.CODEX_HOME.startsWith(fakeHome), "线程必须跑在产品 CODEX_HOME 下，而不是用户主目录");
 });
 
 test("工作目录必须在数据根之下 —— 不在指令根后代里时宪法加载不到,而引擎不报错", async () => {
@@ -616,4 +642,64 @@ test("🔴 浏览器 UI 场景：后端默认缺 key，但用户自己配了 —
   } finally {
     if (before === undefined) delete process.env.MIMO_API_KEY; else process.env.MIMO_API_KEY = before;
   }
+});
+
+/** 假 Codex：从提示词里取出令牌再回复 —— 探针令牌是随机的，静态回放做不了这件事 */
+function echoProbeCodex(cap: Cap, transform: (token: string) => string = (t) => t) {
+  return (codexOptions: Record<string, unknown>) => {
+    cap.codexOptions = codexOptions;
+    return ({
+      startThread(opts: Record<string, unknown>) {
+        cap.opts = opts;
+        cap.threadStarts = (cap.threadStarts ?? 0) + 1;
+        return {
+          id: "t-probe",
+          runStreamed(prompt: string, turnOptions?: Record<string, unknown>) {
+            cap.prompts.push(prompt);
+            if (turnOptions) cap.turnOptions = turnOptions;
+            const token = prompt.match(/probe-[0-9a-f]{16}/)?.[0] ?? "";
+            return Promise.resolve({
+              events: (async function* () {
+                yield { type: "item.completed", item: { type: "agent_message", text: transform(token) } };
+              })(),
+            });
+          },
+        };
+      },
+    }) as never;
+  };
+}
+
+test("连接探针：后端固定令牌、不带资料、一次性线程，走业务对话同一条路，且必须回复本次令牌才算通（#40）", async () => {
+  resetChatSessions();
+  const cap: Cap = { prompts: [] };
+  const root = tmp();
+  const one = await llmProbe({ repoRoot: REPO, dataRoot: root }, {}, echoProbeCodex(cap));
+  const two = await llmProbe({ repoRoot: REPO, dataRoot: root }, {}, echoProbeCodex(cap));
+  assert.equal(one.ok, true);
+  assert.equal(two.ok, true);
+  assert.equal(cap.threadStarts, 2, "每次探针必须新建线程");
+  assert.equal(chatSessionCount(), 0, "探针线程不得进入自由对话会话表");
+  assert.equal(cap.prompts.length, 2);
+  const tokens = cap.prompts.map((p) => p.match(/probe-[0-9a-f]{16}/g) ?? []);
+  for (const [i, p] of cap.prompts.entries()) {
+    assert.equal(tokens[i]!.length, 1, "用户层只有后端生成的一次性令牌");
+    assert.ok(!p.includes("【用户资料库检索结果】"), "探针不得携带任何资料片段");
+    assert.match(p, /对话模式/, "探针与业务对话同一份开场白（真实对话测试，AGENTS.md §5.2）");
+  }
+  assert.notEqual(tokens[0]![0], tokens[1]![0], "令牌一次一换");
+  assert.match(String((cap.codexOptions?.config as Record<string, unknown>)?.developer_instructions), /连接检测/);
+  assert.equal(cap.turnOptions?.outputSchema, undefined, "自由文本回复，不用 schema 把模型圈成只会回填 JSON");
+  assert.equal(cap.opts?.sandboxMode, "read-only");
+  assert.equal(cap.opts?.networkAccessEnabled, false);
+});
+
+test("连接探针：有响应但没回复本次令牌 → 判失败；回复里夹着令牌也算通", async () => {
+  resetChatSessions();
+  const root = tmp();
+  const bad = (e: unknown) => e instanceof ChatError && e.code === "probe_bad_output";
+  await assert.rejects(llmProbe({ repoRoot: REPO, dataRoot: root }, {}, echoProbeCodex({ prompts: [] }, () => "连接成功")), bad);
+  await assert.rejects(llmProbe({ repoRoot: REPO, dataRoot: root }, {}, echoProbeCodex({ prompts: [] }, () => "probe-0000000000000000")), bad);
+  const lenient = await llmProbe({ repoRoot: REPO, dataRoot: root }, {}, echoProbeCodex({ prompts: [] }, (t) => `好的，${t}`));
+  assert.equal(lenient.ok, true);
 });
