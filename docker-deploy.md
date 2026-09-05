@@ -13,25 +13,36 @@
 ## 快速部署
 
 ```bash
-# 生成 API token
-export VRA_API_TOKEN=$(openssl rand -hex 32)
-
-# 启动
 docker compose up -d
-
-# 查看日志
 docker compose logs -f
 ```
 
 浏览器打开 http://localhost:5899
 
+零配置启动：API token 自动生成并持久化到 `/data/api.token`，无需手动设置。
+
 ## 环境变量
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
-| `VRA_API_TOKEN` | ✅ | API 认证 token（至少 32 位）。生成：`openssl rand -hex 32` |
 | `VRA_DATA_ROOT` | ✅ | 容器内数据目录，通常设为 `/data` |
+| `VRA_API_TOKEN` | 否 | API 认证 token。不设置则自动生成并持久化 |
 | `VRA_PYTHON` | 否 | Python 路径，默认 `/app/.venv/bin/python` |
+
+## 复用主机 AI 订阅登录态
+
+如果主机上已登录过 Claude Code 或 Codex，可以直接挂载凭据目录，免去容器内重新登录：
+
+编辑 `docker-compose.yml`，取消对应注释：
+
+```yaml
+volumes:
+  - vibe-data:/data
+  - claude-config:/root/.claude
+  # 复用主机登录态（取消注释）
+  - ${HOME}/.claude:/root/.claude              # Claude Code
+  - ${HOME}/.codex:/app/.local/codex-home      # Codex
+```
 
 ## 接入 AI
 
@@ -52,7 +63,6 @@ docker compose logs -f
 
 **Codex 登录：**
 ```bash
-# 进入容器交互式登录
 docker exec -it vibe-research bash
 CODEX_HOME=/app/.local/codex-home codex login --device-auth
 # 按提示在浏览器完成授权
@@ -60,14 +70,13 @@ CODEX_HOME=/app/.local/codex-home codex login --device-auth
 
 **Claude Code 登录：**
 ```bash
-# 进入容器交互式登录
 docker exec -it vibe-research claude
 # 在 Claude Code 交互界面中执行 /login 完成授权
 ```
 
-登录态存储在 /root/.claude/（已通过 claude-config 卷持久化），容器重启后无需重新登录。
+登录态持久化：Codex 存储在 `/data/codex-home`（vibe-data 卷），Claude Code 存储在 `/root/.claude`（claude-config 卷），容器重启后无需重新登录。
 
-> 如果不需要订阅接入，使用 API 接入即可，无需登录。API key 只存浏览器 localStorage。
+> 如果不需要订阅接入，使用 API 接入即可，无需登录。
 
 ## 数据持久化
 
@@ -90,7 +99,6 @@ docker compose logs -f
 ```
 
 常见原因：
-- `VRA_API_TOKEN` 未设置
 - 端口被占用
 - Python 依赖缺失
 
