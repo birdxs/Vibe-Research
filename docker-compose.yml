@@ -16,13 +16,11 @@ services:
       - "5899:80"
     environment:
       - VRA_DATA_ROOT=/data
-      # - VRA_API_TOKEN=your-token  # 可选：不设置则自动生成并持久化到 /data/api.token
     volumes:
       - vibe-data:/data
-      - claude-config:/root/.claude
       # ── 复用主机登录态（取消注释即可） ──
-      # - ${HOME}/.claude:/root/.claude    # Claude Code 登录态
-      # - ${HOME}/.codex:/app/.local/codex-home  # Codex 登录态
+      # - ${HOME}/.claude:/data/claude-home    # Claude Code 登录态
+      # - ${HOME}/.codex:/data/codex-home      # Codex 登录态
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
       interval: 30s
@@ -32,6 +30,4 @@ services:
 
 volumes:
   vibe-data:
-    driver: local
-  claude-config:
     driver: local

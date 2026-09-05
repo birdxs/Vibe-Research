@@ -38,10 +38,9 @@ docker compose logs -f
 ```yaml
 volumes:
   - vibe-data:/data
-  - claude-config:/root/.claude
   # 复用主机登录态（取消注释）
-  - ${HOME}/.claude:/root/.claude              # Claude Code
-  - ${HOME}/.codex:/app/.local/codex-home      # Codex
+  - ${HOME}/.claude:/data/claude-home    # Claude Code
+  - ${HOME}/.codex:/data/codex-home      # Codex
 ```
 
 ## 接入 AI
@@ -64,7 +63,7 @@ volumes:
 **Codex 登录：**
 ```bash
 docker exec -it vibe-research bash
-CODEX_HOME=/app/.local/codex-home codex login --device-auth
+CODEX_HOME=/data/codex-home codex login --device-auth
 # 按提示在浏览器完成授权
 ```
 
@@ -74,7 +73,7 @@ docker exec -it vibe-research claude
 # 在 Claude Code 交互界面中执行 /login 完成授权
 ```
 
-登录态持久化：Codex 存储在 `/data/codex-home`（vibe-data 卷），Claude Code 存储在 `/root/.claude`（claude-config 卷），容器重启后无需重新登录。
+登录态持久化：Codex 存储在 /data/codex-home，Claude Code 存储在 /data/claude-home（均在 vibe-data 卷内），容器重启后无需重新登录。
 
 > 如果不需要订阅接入，使用 API 接入即可，无需登录。
 

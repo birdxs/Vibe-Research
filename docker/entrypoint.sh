@@ -14,6 +14,13 @@ export VRA_DATA_ROOT="${VRA_DATA_ROOT:-/data}"
 
 mkdir -p /data
 
+# ── Claude Code 登录态：重定向到 /data/claude-home ──
+mkdir -p /data/claude-home
+if [ ! -L /root/.claude ]; then
+    rm -rf /root/.claude
+    ln -sf /data/claude-home /root/.claude
+fi
+
 # ── API token：用户未设置时自动生成并持久化 ──
 # API 绑定 0.0.0.0 时强制要求 VRA_API_TOKEN，Docker 中 nginx 总是注入 token，
 # 浏览器不持有，所以这个 token 不增加安全性，自动生成即可。
