@@ -125,7 +125,12 @@ function chatCodexOptions(cfg: RunConfig, engineEnv: NodeJS.ProcessEnv, workingD
   const base = codexOptionsFor({ ...cfg, executionMode: "shell_hooks", codexPath: realCodex }, engineEnv);
   // MCP 发现必须与线程的真实 cwd 完全一致。对话 cwd 是 dataRoot/chat/<session>，
   // 不是研究配置的 cfg.runDir；用错目录会漏掉会话目录下的 `.codex/config.toml`。
-  const mcpIsolation = mcpIsolationOverride({ ...cfg, runDir: workingDirectory }, undefined, engineEnv);
+  // 🔴 也必须与线程的真实 **env** 完全一致（#44）：`engineEnv` 是裸的 process.env / rt.env，
+  //    不含产品的 CODEX_HOME；拿它去跑 `codex mcp list` 读到的是用户全局 ~/.codex 的 MCP，
+  //    而线程本身跑在产品 CODEX_HOME 下、那些 server 并不存在 —— 把它们投影成只含
+  //    `enabled = false` 的根表，codex ≥0.149 直接报 `invalid transport`，对话与「测试并保存」全挂。
+  //    `base.env` 就是线程收到的那份 env（含 CODEX_HOME），发现与执行必须共用它。
+  const mcpIsolation = mcpIsolationOverride({ ...cfg, runDir: workingDirectory }, undefined, base.env);
   const baseConfig = (base.config ?? {}) as Record<string, unknown>;
   const foreignSkills = listForeignSkillPaths({ codexHome: cfg.codexHome, productRoots: [cfg.repoRoot] });
   return {
@@ -600,6 +605,45 @@ export async function translateHeadlines(
     out.push({ id, zh });
   }
   return { items: out, redacted, duration_ms: turn.duration_ms };
+}
+
+export interface LlmProbeResult {
+  ok: true;
+  duration_ms: number;
+}
+
+const LLM_PROBE_INSTRUCTIONS = [
+  "本轮是连接检测。用户消息里有一个形如 probe-xxxxxxxxxxxxxxxx 的一次性令牌。",
+  "只回复这个令牌本身,不要加任何解释、问候或其它内容。",
+].join("\n");
+
+/**
+ * 连接探针:只验证 provider / base URL / key / model 能否完成一次真实对话。
+ *
+ * 🔴 这不是第二个聊天入口。探针文本由后端固定生成(一次性随机令牌),不接收客户端任意 prompt;
+ *    不召回资料库、不复用持久线程。设置页「测试并保存」此前借用普通 /chat,于是继承了资料召回与引用校验:
+ *    被「连接 / 检测 / 成功」这类二字片段命中的用户资料会发给正在测试、尚未验证的 provider,
+ *    而模型只回一句"连接成功"又会因缺少 [资料:…] 引用被判成测试失败(#40)。
+ * ⚠️ 除了不召回资料,其余**与业务对话走同一条路**:同一份开场白、同一个 developer 层、同一道合规 gate、
+ *    自由文本回复 —— 仓库规则要求「先完成真实对话测试,成功才保存」(AGENTS.md §5.2),
+ *    一个只会回填短 JSON 的受限模型不该被判成可用(Codex r2 P2)。
+ * ⚠️ 判成功的依据是**回复里原样出现本次令牌**:只看"有响应"会把网关返回的一段错误 HTML 也当成功。
+ */
+export async function llmProbe(
+  opts: { repoRoot: string; dataRoot?: string; python?: string; signal?: AbortSignal },
+  req: { llm?: LlmOverride },
+  codexFactory: (o: CodexOptions) => Codex = (o) => new Codex(o),
+): Promise<LlmProbeResult> {
+  const token = `probe-${crypto.randomBytes(8).toString("hex")}`;
+  const turn = await chatSend(
+    { ...opts, maxMessage: 256, developerInstructions: LLM_PROBE_INSTRUCTIONS, persistent: false },
+    { session: "llm-probe", message: `连接检测令牌:${token}`, ...(req.llm ? { llm: req.llm } : {}) },
+    codexFactory,
+  );
+  if (!turn.reply.includes(token)) {
+    throw new ChatError("probe_bad_output", "模型已响应,但没有按要求回复本次连接检测令牌。请确认所选模型能遵循指令后重试");
+  }
+  return { ok: true, duration_ms: turn.duration_ms };
 }
 
 /**

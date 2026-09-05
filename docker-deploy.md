@@ -13,25 +13,35 @@
 ## 快速部署
 
 ```bash
-# 生成 API token
-export VRA_API_TOKEN=$(openssl rand -hex 32)
-
-# 启动
 docker compose up -d
-
-# 查看日志
 docker compose logs -f
 ```
 
 浏览器打开 http://localhost:5899
 
+零配置启动：API token 自动生成并持久化到 `/data/api.token`，无需手动设置。
+
 ## 环境变量
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
-| `VRA_API_TOKEN` | ✅ | API 认证 token（至少 32 位）。生成：`openssl rand -hex 32` |
 | `VRA_DATA_ROOT` | ✅ | 容器内数据目录，通常设为 `/data` |
+| `VRA_API_TOKEN` | 否 | API 认证 token。不设置则自动生成并持久化 |
 | `VRA_PYTHON` | 否 | Python 路径，默认 `/app/.venv/bin/python` |
+
+## 复用主机 AI 订阅登录态
+
+如果主机上已登录过 Claude Code 或 Codex，可以直接挂载凭据目录，免去容器内重新登录：
+
+编辑 `docker-compose.yml`，取消对应注释：
+
+```yaml
+volumes:
+  - vibe-data:/data
+  # 复用主机登录态（取消注释）
+  - ${HOME}/.claude:/data/claude-home    # Claude Code
+  - ${HOME}/.codex:/data/codex-home      # Codex
+```
 
 ## 接入 AI
 
@@ -45,21 +55,28 @@ docker compose logs -f
 4. 点击「测试并保存」
 
 > API key 只保存在你浏览器的 localStorage 里，提问时经后端转给模型服务商，用完即弃——不进入配置文件、日志或仓库。
+> ⚠️ 端点必须支持 **Responses API**（引擎已不再支持 Chat Completions）。填写自定义端点前请确认供应商支持该协议。
 
 ### 订阅接入（Codex / Claude Code）
 
-Codex 登录需要浏览器 OAuth 流程，在 Docker 容器中无法直接完成。可行路径：
+订阅接入需要浏览器 OAuth 登录，在 Docker 中需要手动操作一次：
 
+**Codex 登录：**
 ```bash
-# 方式一：docker exec 进容器手动登录（需要容器内有浏览器环境）
 docker exec -it vibe-research bash
-CODEX_HOME=/app/.local/codex-home codex login --device-auth
-
-# 方式二（推荐）：使用 API 接入替代订阅接入
-# 在 Web 界面「接入 AI」→「API 填写自己的 key
+CODEX_HOME=/data/codex-home codex login --device-auth
+# 按提示在浏览器完成授权
 ```
 
-> Claude Code 依赖需要在构建时安装。当前 Docker 镜像未包含 Claude Code CLI。如需使用，请通过 API 接入方式配置。
+**Claude Code 登录：**
+```bash
+docker exec -e CLAUDE_CONFIG_DIR=/data/claude-home -it vibe-research claude
+# 在 Claude Code 交互界面中执行 /login 完成授权
+```
+
+登录态持久化：Codex 存储在 /data/codex-home，Claude Code 存储在 /data/claude-home（均在 vibe-data 卷内），容器重启后无需重新登录。
+
+> 如果不需要订阅接入，使用 API 接入即可，无需登录。
 
 ## 数据持久化
 
@@ -82,7 +99,6 @@ docker compose logs -f
 ```
 
 常见原因：
-- `VRA_API_TOKEN` 未设置
 - 端口被占用
 - Python 依赖缺失
 

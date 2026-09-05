@@ -9,9 +9,9 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.1-F35D2B">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.4-F35D2B">
   <img alt="UI" src="https://img.shields.io/badge/UI-React%20%2B%20Vite-646cff">
-  <img alt="Orchestrator tests" src="https://img.shields.io/badge/orchestrator-539%20checks-passing">
+  <img alt="Orchestrator tests" src="https://img.shields.io/badge/orchestrator-540%20checks-passing">
   <img alt="Desktop tests" src="https://img.shields.io/badge/desktop-25%20tests-passing">
   <img alt="Codex Harness" src="https://img.shields.io/badge/runtime-Codex%20Harness-black">
 </p>
@@ -29,6 +29,16 @@
   <a href="#current-boundaries">Boundaries</a> ·
   <a href="CHANGELOG.md">CHANGELOG</a>
 </p>
+
+---
+
+## Open to AI Roles in Shenzhen
+
+The author is open to AI roles in Shenzhen, particularly in **AI-powered investment research products, Forward Deployed Engineering (FDE), and AI consulting or solutions** at Tencent, other leading technology companies, and financial institutions.
+
+He combines experience in financial institutions with hands-on AI product development, building open-source market data tools and multi-agent systems with **17K+ GitHub stars**.
+
+Contact: [simonlin0423@gmail.com](mailto:simonlin0423@gmail.com)
 
 ---
 
@@ -101,6 +111,8 @@ model guesses.
 | Codex CLI | Version 0.149.0 verified; see `codex-version.json` |
 | Model access | ChatGPT or Claude.ai subscription login, or a provider that supports the Responses API |
 
+> Node must be a build with TypeScript support enabled (the official nodejs.org installers and anything installed via nvm / fnm / Volta are): `node -p process.features.typescript` should print `strip` or `transform`. Some Linux distribution packages ship Node compiled without it; starting the app or running tests then fails with `ERR_UNKNOWN_FILE_EXTENSION ".ts"` / `ERR_NO_TYPESCRIPT` — switch to an official build. `npm test` runs this check first and prints the same guidance.
+
 ### Install dependencies
 
 Windows (PowerShell or Command Prompt):
@@ -157,6 +169,7 @@ On Windows, `scripts\start.cmd` handles both processes. On macOS / Linux, open t
 
 ```bash
 # Terminal 1: local API
+node scripts/check-node.mjs   # optional runtime self-check, see the Node note above
 node orchestrator/src/api.ts --port 8765
 ```
 
@@ -243,9 +256,16 @@ The **Connect AI** page separates the agent runtime from the model provider:
 - In API mode, the key remains in the current browser's `localStorage`. It is sent to the local backend per request
   and is not written to the repository, configuration files, run ledger, or logs.
 
-Built-in provider templates: OpenAI, DeepSeek, Qwen, GLM, Kimi, and MiMo. The engine supports the Responses API
+Built-in provider templates: OpenAI, DeepSeek, Qwen, GLM, Kimi, and MiMo, plus a `selfhosted` placeholder
+template (vLLM / SGLang / LM Studio / Ollama and other OpenAI-compatible endpoints; see the self-hosted section of
+[docs/model-access.md](docs/model-access.md)). The engine supports the Responses API
 only. A template's presence does not mean it passed the compatibility matrix; the UI distinguishes verified
 providers from unverified templates.
+
+**LAN access (optional)**: by default the desktop binds to localhost only. To run on an always-on machine and open
+it from another device on the same LAN, start with `VRA_LAN=1` (`VRA_LAN=1 npm run dev`): the frontend binds
+`0.0.0.0` and the local proxy normalizes the Origin to loopback; the backend's cross-site protection is unchanged.
+Only enable it on a trusted LAN and never expose the port to the public internet.
 
 See [docs/model-access.md](docs/model-access.md) and [providers/README.md](providers/README.md).
 

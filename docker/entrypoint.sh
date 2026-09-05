@@ -14,18 +14,35 @@ export VRA_DATA_ROOT="${VRA_DATA_ROOT:-/data}"
 
 mkdir -p /data
 
-# 启动后端 API（后台）
+# ── API token：用户未设置时自动生成并持久化 ──
+# API 绑定 0.0.0.0 时强制要求 VRA_API_TOKEN，Docker 中 nginx 总是注入 token，
+# 浏览器不持有，所以这个 token 不增加安全性，自动生成即可。
+if [ -z "$VRA_API_TOKEN" ]; then
+    TOKEN_FILE="/data/api.token"
+    if [ -f "$TOKEN_FILE" ]; then
+        VRA_API_TOKEN=$(cat "$TOKEN_FILE" | tr -d '[:space:]')
+        echo "==> VRA_API_TOKEN loaded from $TOKEN_FILE"
+    else
+        VRA_API_TOKEN=$(openssl rand -hex 32)
+        echo "$VRA_API_TOKEN" > "$TOKEN_FILE"
+        chmod 600 "$TOKEN_FILE"
+        echo "==> VRA_API_TOKEN auto-generated and saved to $TOKEN_FILE"
+    fi
+fi
+export VRA_API_TOKEN
+
+# ── 启动后端 API（后台） ──
 cd /app
 node --experimental-strip-types orchestrator/src/api.ts --port 8765 --host 0.0.0.0 &
 BACKEND_PID=$!
 echo "==> Backend PID: $BACKEND_PID"
 
-# 等待后端就绪
+# ── 等待后端就绪 ──
 echo "==> Waiting for backend to start..."
 READY=0
 for i in $(seq 1 60); do
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-        ${VRA_API_TOKEN:+-H "Authorization: Bearer $VRA_API_TOKEN"} \
+        -H "Authorization: Bearer $VRA_API_TOKEN" \
         http://127.0.0.1:8765/health 2>/dev/null || true)
     if [ "$HTTP_CODE" = "200" ]; then
         echo "==> Backend is ready! (HTTP $HTTP_CODE)"
@@ -48,24 +65,9 @@ if [ "$READY" -ne 1 ]; then
     exit 1
 fi
 
-# 注入 API token 到 nginx 配置
-NGINX_API_TOKEN="${VRA_API_TOKEN:-}"
-if [ -z "$NGINX_API_TOKEN" ]; then
-    for f in "/data/api.token" "/app/.local/api.token" "/app/api.token"; do
-        if [ -f "$f" ]; then
-            NGINX_API_TOKEN=$(cat "$f" | tr -d '[:space:]')
-            echo "==> API token loaded from $f (${#NGINX_API_TOKEN} chars)"
-            break
-        fi
-    done
-fi
-
-if [ -n "$NGINX_API_TOKEN" ]; then
-    echo "==> API token configured for nginx proxy (${#NGINX_API_TOKEN} chars)"
-else
-    echo "==> WARNING: No API token found, API proxy may fail"
-fi
-export NGINX_API_TOKEN
+# ── 注入 API token 到 nginx 配置 ──
+export NGINX_API_TOKEN="$VRA_API_TOKEN"
+echo "==> API token configured for nginx proxy (${#NGINX_API_TOKEN} chars)"
 
 # 生成 nginx 配置（注入 API token）
 envsubst '${NGINX_API_TOKEN}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
