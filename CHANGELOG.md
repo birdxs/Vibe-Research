@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-09-05
+
+V1.0.4 只收一条：codex ≥0.149 下带全局 MCP 配置的用户「测试并保存」与对话全部失败（#44）。
+
 - 修复 #44：用户全局 `~/.codex/config.toml` 里配了任意 `[mcp_servers.*]` 时，「接入 AI → 测试并保存」与自由对话
   一律失败并报「本地 Agent 暂时没有连接成功」，底层是 codex ≥0.149 的 `invalid transport`。根因：对话路径生成 MCP
   隔离覆盖时，`codex mcp list` 拿的是不含 `CODEX_HOME` 的裸环境，枚举到的是用户全局的 MCP；而线程本身跑在产品自己的
