@@ -1,7 +1,10 @@
 #!/bin/bash
 # 不用 set -e，手动处理错误
 
-echo "==> Starting Vibe-Research v1.0.1..."
+# 从 orchestrator package.json 读取版本号
+APP_VERSION=$(node -e "try{console.log(require('./orchestrator/package.json').version)}catch{console.log('unknown')}" 2>/dev/null || echo "unknown")
+
+echo "==> Starting Vibe-Research v${APP_VERSION}..."
 echo "    Frontend: http://0.0.0.0:80"
 echo "    Backend:  http://0.0.0.0:8765"
 echo "    Data root: ${VRA_DATA_ROOT:-/data}"
