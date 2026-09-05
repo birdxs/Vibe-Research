@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.3-F35D2B">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.4-F35D2B">
   <img alt="UI" src="https://img.shields.io/badge/UI-React%20%2B%20Vite-646cff">
   <img alt="Orchestrator tests" src="https://img.shields.io/badge/orchestrator-540%20checks-passing">
   <img alt="Desktop tests" src="https://img.shields.io/badge/desktop-25%20tests-passing">
@@ -32,9 +32,11 @@
 
 ---
 
-## 作者正在寻找工作机会
+## 寻找深圳的 AI 工作机会
 
-作者目前关注腾讯等大型科技企业在深圳的 AI 相关岗位，希望加入一支热爱 AI 开发的团队，继续从事 AI / Agent 产品开发、应用落地及 AI 咨询工作。
+作者目前正在寻找深圳的 AI 相关工作机会，重点关注腾讯等大型科技企业及金融机构的 **AI 投研产品、FDE 与 AI 咨询 / 解决方案岗位**。
+
+兼具金融机构从业经历与 AI 产品实战，持续构建金融市场数据工具和多智能体系统，开源项目累计获得 **17K+ GitHub Stars**。
 
 联系：[simonlin0423@gmail.com](mailto:simonlin0423@gmail.com)
 
@@ -243,10 +245,15 @@ ChatGPT / Claude.ai 订阅 · OpenAI · DeepSeek · Qwen · GLM · Kimi · MiMo 
 - API 模式的 key 只保存在当前浏览器 `localStorage`，随请求交给本机后端，不写入仓库、配置文件、
   运行账本或日志。
 
-内置 provider 模板：OpenAI、DeepSeek、Qwen、GLM、Kimi、MiMo。引擎只支持 Responses API；
+内置 provider 模板：OpenAI、DeepSeek、Qwen、GLM、Kimi、MiMo，以及 `selfhosted` 自托管占位模板
+（vLLM / SGLang / LM Studio / Ollama 等 OpenAI 兼容端点，私有化部署走 §自托管模型）。引擎只支持 Responses API；
 模板存在不等于已经通过兼容矩阵，界面会区分“已实测”和“有模板、未实测”。
 
 详细说明见 [docs/model-access.md](docs/model-access.md) 和 [providers/README.md](providers/README.md)。
+
+**局域网访问（可选）**：默认只绑本机。想在一台常开的机器上跑、从同一局域网的其它设备打开，
+启动前设 `VRA_LAN=1`（`VRA_LAN=1 npm run dev`）：前端改绑 `0.0.0.0`，本机代理把 Origin 归一化为回环，
+后端的跨站防护不动。只建议在受信任的局域网内开启，不要把这个端口暴露到公网。
 
 ## 数据与市场
 

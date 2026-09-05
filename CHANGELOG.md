@@ -4,6 +4,23 @@
 
 ## [Unreleased]
 
+- 新增（#34，by @WenhuaXia）：局域网访问显式开关 `VRA_LAN=1`——默认行为不变（desktop 仍只绑 127.0.0.1），
+  开启后 vite 绑 `0.0.0.0` 并由本机代理把 Origin 归一化为回环，后端 `crossSiteReject` 不动；provider 模板
+  `base_url` 放开到 http(s)（与 `assertHttp` 口径一致），新增 `selfhosted` 占位模板与私有化部署文档
+  （`docs/model-access.md` §3）；回测页不再依赖明文 HTTP 下浏览器不提供的 `crypto.randomUUID`。
+  合并后补：README 中英文写明开关用法与「只在受信任局域网开启」的提醒。
+
+## [1.0.4] - 2026-09-05
+
+V1.0.4 只收一条：codex ≥0.149 下带全局 MCP 配置的用户「测试并保存」与对话全部失败（#44）。
+
+- 修复 #44：用户全局 `~/.codex/config.toml` 里配了任意 `[mcp_servers.*]` 时，「接入 AI → 测试并保存」与自由对话
+  一律失败并报「本地 Agent 暂时没有连接成功」，底层是 codex ≥0.149 的 `invalid transport`。根因：对话路径生成 MCP
+  隔离覆盖时，`codex mcp list` 拿的是不含 `CODEX_HOME` 的裸环境，枚举到的是用户全局的 MCP；而线程本身跑在产品自己的
+  `CODEX_HOME` 下，那些 server 并不存在，被投影成只含 `enabled = false` 的根表后当场被判非法。现在 MCP 发现与线程共用
+  同一份引擎环境（`configuredMcpServerNames` 亦强制注入产品 `CODEX_HOME`，目录不存在先建），枚举结果来自产品隔离环境，
+  也兑现了「不读取 `~/.codex`」的承诺。新增回归：伪造带全局 MCP 的用户主目录，对话覆盖里不得出现它。
+
 ## [1.0.3] - 2026-09-02
 
 V1.0.3 收口 Issue #38 / #39 / #40：普通对话不再被资料库泛词误召回，设置页连接检测改走专用探针，

@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.3-F35D2B">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.4-F35D2B">
   <img alt="UI" src="https://img.shields.io/badge/UI-React%20%2B%20Vite-646cff">
   <img alt="Orchestrator tests" src="https://img.shields.io/badge/orchestrator-540%20checks-passing">
   <img alt="Desktop tests" src="https://img.shields.io/badge/desktop-25%20tests-passing">
@@ -32,9 +32,11 @@
 
 ---
 
-## The Author Is Open to Opportunities
+## Open to AI Roles in Shenzhen
 
-The author is open to AI roles at Tencent and other leading technology companies in Shenzhen, and hopes to join a team passionate about AI development. Areas of interest include AI / Agent product development, real-world deployment, and AI consulting.
+The author is open to AI roles in Shenzhen, particularly in **AI-powered investment research products, Forward Deployed Engineering (FDE), and AI consulting or solutions** at Tencent, other leading technology companies, and financial institutions.
+
+He combines experience in financial institutions with hands-on AI product development, building open-source market data tools and multi-agent systems with **17K+ GitHub stars**.
 
 Contact: [simonlin0423@gmail.com](mailto:simonlin0423@gmail.com)
 
@@ -254,9 +256,16 @@ The **Connect AI** page separates the agent runtime from the model provider:
 - In API mode, the key remains in the current browser's `localStorage`. It is sent to the local backend per request
   and is not written to the repository, configuration files, run ledger, or logs.
 
-Built-in provider templates: OpenAI, DeepSeek, Qwen, GLM, Kimi, and MiMo. The engine supports the Responses API
+Built-in provider templates: OpenAI, DeepSeek, Qwen, GLM, Kimi, and MiMo, plus a `selfhosted` placeholder
+template (vLLM / SGLang / LM Studio / Ollama and other OpenAI-compatible endpoints; see the self-hosted section of
+[docs/model-access.md](docs/model-access.md)). The engine supports the Responses API
 only. A template's presence does not mean it passed the compatibility matrix; the UI distinguishes verified
 providers from unverified templates.
+
+**LAN access (optional)**: by default the desktop binds to localhost only. To run on an always-on machine and open
+it from another device on the same LAN, start with `VRA_LAN=1` (`VRA_LAN=1 npm run dev`): the frontend binds
+`0.0.0.0` and the local proxy normalizes the Origin to loopback; the backend's cross-site protection is unchanged.
+Only enable it on a trusted LAN and never expose the port to the public internet.
 
 See [docs/model-access.md](docs/model-access.md) and [providers/README.md](providers/README.md).
 
