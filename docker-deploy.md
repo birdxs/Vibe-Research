@@ -48,18 +48,26 @@ docker compose logs -f
 
 ### 订阅接入（Codex / Claude Code）
 
-Codex 登录需要浏览器 OAuth 流程，在 Docker 容器中无法直接完成。可行路径：
+订阅接入需要浏览器 OAuth 登录，在 Docker 中需要手动操作一次：
 
+**Codex 登录：**
 ```bash
-# 方式一：docker exec 进容器手动登录（需要容器内有浏览器环境）
+# 进入容器交互式登录
 docker exec -it vibe-research bash
 CODEX_HOME=/app/.local/codex-home codex login --device-auth
-
-# 方式二（推荐）：使用 API 接入替代订阅接入
-# 在 Web 界面「接入 AI」→「API 填写自己的 key
+# 按提示在浏览器完成授权
 ```
 
-> Claude Code 依赖需要在构建时安装。当前 Docker 镜像未包含 Claude Code CLI。如需使用，请通过 API 接入方式配置。
+**Claude Code 登录：**
+```bash
+# 进入容器交互式登录
+docker exec -it vibe-research claude
+# 在 Claude Code 交互界面中执行 /login 完成授权
+```
+
+登录态存储在 /root/.claude/（已通过 claude-config 卷持久化），容器重启后无需重新登录。
+
+> 如果不需要订阅接入，使用 API 接入即可，无需登录。API key 只存浏览器 localStorage。
 
 ## 数据持久化
 

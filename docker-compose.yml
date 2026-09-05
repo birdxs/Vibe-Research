@@ -12,6 +12,7 @@ services:
       - VRA_API_TOKEN=${VRA_API_TOKEN:?请在 .env 或命令行设置 VRA_API_TOKEN}
     volumes:
       - vibe-data:/data
+      - claude-config:/root/.claude
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
       interval: 30s
@@ -20,5 +21,7 @@ services:
       start_period: 15s
 
 volumes:
+  claude-config:
+    driver: local
   vibe-data:
     driver: local

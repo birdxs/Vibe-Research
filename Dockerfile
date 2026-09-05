@@ -38,6 +38,9 @@ WORKDIR /app/orchestrator
 RUN npm install
 WORKDIR /app
 
+# Claude Code CLI（订阅接入需要）
+RUN npm install -g @anthropic-ai/claude-code
+
 RUN python3 -m venv /app/.venv
 COPY .agents/skills/data-access/scripts/requirements.txt /tmp/requirements.txt
 RUN /app/.venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt \
