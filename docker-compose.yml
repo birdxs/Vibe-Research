@@ -2,7 +2,7 @@
 
 services:
   vibe-research:
-    image: ${GHCR_IMAGE:-ghcr.io/your-username/vibe-research:latest}
+    image: ghcr.io/simonlin1212/vibe-research:latest
     container_name: vibe-research
     restart: unless-stopped
     ports:
