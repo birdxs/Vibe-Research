@@ -55,6 +55,7 @@ volumes:
 4. 点击「测试并保存」
 
 > API key 只保存在你浏览器的 localStorage 里，提问时经后端转给模型服务商，用完即弃——不进入配置文件、日志或仓库。
+> ⚠️ 端点必须支持 **Responses API**（引擎已不再支持 Chat Completions）。填写自定义端点前请确认供应商支持该协议。
 
 ### 订阅接入（Codex / Claude Code）
 
