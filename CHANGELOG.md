@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+- 新增（#34，by @WenhuaXia）：局域网访问显式开关 `VRA_LAN=1`——默认行为不变（desktop 仍只绑 127.0.0.1），
+  开启后 vite 绑 `0.0.0.0` 并由本机代理把 Origin 归一化为回环，后端 `crossSiteReject` 不动；provider 模板
+  `base_url` 放开到 http(s)（与 `assertHttp` 口径一致），新增 `selfhosted` 占位模板与私有化部署文档
+  （`docs/model-access.md` §3）；回测页不再依赖明文 HTTP 下浏览器不提供的 `crypto.randomUUID`。
+  合并后补：README 中英文写明开关用法与「只在受信任局域网开启」的提醒。
+
 ## [1.0.4] - 2026-09-05
 
 V1.0.4 只收一条：codex ≥0.149 下带全局 MCP 配置的用户「测试并保存」与对话全部失败（#44）。

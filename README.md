@@ -251,6 +251,10 @@ ChatGPT / Claude.ai 订阅 · OpenAI · DeepSeek · Qwen · GLM · Kimi · MiMo 
 
 详细说明见 [docs/model-access.md](docs/model-access.md) 和 [providers/README.md](providers/README.md)。
 
+**局域网访问（可选）**：默认只绑本机。想在一台常开的机器上跑、从同一局域网的其它设备打开，
+启动前设 `VRA_LAN=1`（`VRA_LAN=1 npm run dev`）：前端改绑 `0.0.0.0`，本机代理把 Origin 归一化为回环，
+后端的跨站防护不动。只建议在受信任的局域网内开启，不要把这个端口暴露到公网。
+
 ## 数据与市场
 
 - 当前注册表：**117 个端点、30 层**，覆盖 CN、US、HK。

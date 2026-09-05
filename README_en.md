@@ -256,9 +256,16 @@ The **Connect AI** page separates the agent runtime from the model provider:
 - In API mode, the key remains in the current browser's `localStorage`. It is sent to the local backend per request
   and is not written to the repository, configuration files, run ledger, or logs.
 
-Built-in provider templates: OpenAI, DeepSeek, Qwen, GLM, Kimi, and MiMo. The engine supports the Responses API
+Built-in provider templates: OpenAI, DeepSeek, Qwen, GLM, Kimi, and MiMo, plus a `selfhosted` placeholder
+template (vLLM / SGLang / LM Studio / Ollama and other OpenAI-compatible endpoints; see the self-hosted section of
+[docs/model-access.md](docs/model-access.md)). The engine supports the Responses API
 only. A template's presence does not mean it passed the compatibility matrix; the UI distinguishes verified
 providers from unverified templates.
+
+**LAN access (optional)**: by default the desktop binds to localhost only. To run on an always-on machine and open
+it from another device on the same LAN, start with `VRA_LAN=1` (`VRA_LAN=1 npm run dev`): the frontend binds
+`0.0.0.0` and the local proxy normalizes the Origin to loopback; the backend's cross-site protection is unchanged.
+Only enable it on a trusted LAN and never expose the port to the public internet.
 
 See [docs/model-access.md](docs/model-access.md) and [providers/README.md](providers/README.md).
 
