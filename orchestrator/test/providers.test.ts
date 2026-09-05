@@ -34,7 +34,10 @@ test("providers:产品模板全部通过 schema;openai 为 responses 原生;国�
       assert.equal(profile.wire_api, "responses", `${id} 不能再用 chat 协议(引擎已移除)`);
       assert.equal(profile.requires_openai_auth, false);
       assert.deepEqual(profile.auth_modes, ["api_key"]);
-      assert.ok(profile.base_url!.startsWith("https://"));
+      // selfhosted 是占位模板:base_url 填的是用户本机/内网端点,http 合法(私有化部署常态);
+      // 其余云厂商模板必须是 https —— Codex 对空 base_url 回退 api.openai.com,密钥会发到错误主机
+      if (id === "selfhosted") assert.ok(profile.base_url!.startsWith("http://"), "selfhosted 占位默认 http 内网端点");
+      else assert.ok(profile.base_url!.startsWith("https://"));
     }
   }
   assert.throws(() => loadProviderProfile(REPO, path.join(REPO, ".local"), "nope"), /未知 provider/);
@@ -59,6 +62,34 @@ test("providers:带占位符的模板不能直接用 —— 选用时当场拒,�
   }
 });
 
+test("providers:selfhosted 占位模板走真实用户流程 —— 复制覆盖填端点后可用(私有化部署路径)", () => {
+  // 前提:selfhosted 模板带 {Host}:{Port} 占位,default_model 为 null
+  const tpl = JSON.parse(fs.readFileSync(path.join(REPO, "providers", "selfhosted.json"), "utf8"));
+  assert.ok(/[{<][A-Za-z_]/.test(tpl.base_url), "前提:selfhosted 模板确实带占位符");
+  assert.equal(tpl.default_model, null);
+  // ① 直接选用占位模板 → 按设计拒,而不是发一个坏 URL 出去
+  assert.throws(
+    () => loadProviderProfile(REPO, path.join(REPO, ".local"), "selfhosted"),
+    /占位符/,
+    "selfhosted 占位模板不得直接选用",
+  );
+  // ② 用户把模板复制到 <数据根>/providers/selfhosted.json,换成自己的内网 vLLM 端点与模型名
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "vra-sh-"));
+  fs.mkdirSync(path.join(repo, ".local", "providers"), { recursive: true });
+  const overlay = { ...tpl, base_url: "http://192.168.1.10:8000/v1", default_model: "qwen3-32b" };
+  fs.writeFileSync(path.join(repo, ".local", "providers", "selfhosted.json"), JSON.stringify(overlay, null, 2));
+  const loaded = loadProviderProfile(REPO, path.join(repo, ".local"), "selfhosted");
+  assert.equal(loaded.profile.base_url, "http://192.168.1.10:8000/v1", "用户覆盖优先(整份替换),http 内网端点合法");
+  assert.equal(loaded.profile.id, "selfhosted");
+  // ③ 映射到 Codex 配置:env_key 透传,密钥只经环境变量
+  const cfg = codexProviderConfig(loaded.profile) as { model_provider: string; model_providers: Record<string, Record<string, unknown>> };
+  assert.equal(cfg.model_provider, "selfhosted");
+  assert.equal(cfg.model_providers.selfhosted.base_url, "http://192.168.1.10:8000/v1");
+  assert.deepEqual(providerEnv(loaded.profile, "api_key", { SELFHOSTED_API_KEY: "k" }), { SELFHOSTED_API_KEY: "k" });
+  assert.throws(() => providerEnv(loaded.profile, "api_key", {}), /SELFHOSTED_API_KEY/);
+  fs.rmSync(repo, { recursive: true, force: true });
+});
+
 test("providers:validateProfile 拒绝密钥值 / 非 openai requires_openai_auth / openai 自定义 base_url / 非法 env_key", () => {
   const base = { id: "x", name: "X", wire_api: "responses", base_url: "https://x.example/v1", env_key: "X_API_KEY", auth_modes: ["api_key"], requires_openai_auth: false, default_model: "m", responses_support: "native" };
   // 引擎已移除 chat:契约层必须当场拒,并说清两条出路(换 Responses 端点 / 架网关)
@@ -69,7 +100,10 @@ test("providers:validateProfile 拒绝密钥值 / 非 openai requires_openai_aut
   assert.throws(() => validateProfile({ ...base, requires_openai_auth: true }, "t"), /requires_openai_auth/);
   assert.throws(() => validateProfile({ ...base, id: "openai", wire_api: "responses" }, "t"), /base_url 必须为 null/);
   assert.throws(() => validateProfile({ ...base, env_key: "PATH" }, "t"), /schema/);
-  assert.throws(() => validateProfile({ ...base, base_url: "http://insecure" }, "t"), /schema/);
+  // http(s) 均合法:自托管网关 / 本机模型(局域网 vLLM、本地代理)普遍是 http,与 assertHttp 口径一致;
+  // 非 http(s) 协议仍被 schema 拒
+  assert.equal(validateProfile({ ...base, base_url: "http://10.0.0.5:8000/v1" }, "t").id, "x");
+  assert.throws(() => validateProfile({ ...base, base_url: "ftp://insecure" }, "t"), /schema/);
   assert.throws(() => validateProfile({ ...base, extra: 1 }, "t"), /schema/);
 });
 
@@ -160,7 +194,11 @@ test("providers:组合约束——第三方 base_url 不得为空(Codex 会回�
   const base = loadProviderProfile(REPO, path.join(REPO, ".local"), "deepseek").profile;
   const v = (patch: Record<string, unknown>) => () => validateProfile({ ...base, ...patch }, "t");
   assert.doesNotThrow(v({}));
-  assert.throws(v({ base_url: null }), /必须显式给出 https base_url/);
+  assert.throws(v({ base_url: null }), /必须显式给出 http\(s\) base_url/);
+  // base_url 放宽到 http(s):自托管网关 / 本机模型(如局域网 vLLM、本地代理)普遍是 http,
+  // 与 assertHttp 放行 http(s) 的既有口径一致;非 http(s) 协议仍被 schema 拒
+  assert.doesNotThrow(v({ base_url: "http://10.0.0.5:8000/v1" }));
+  assert.throws(v({ base_url: "ftp://x/v1" }), /schema/);
   assert.throws(v({ auth_modes: ["api_key", "chatgpt_login"] }), /只能 auth_modes=\["api_key"\]/);
   assert.throws(v({ auth_modes: ["api_key", "api_key"] }), /schema/);
   // ⚠️ "responses_support=native 要求 wire_api=responses" 这条**现在够不到**:
