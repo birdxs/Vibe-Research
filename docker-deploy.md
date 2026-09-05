@@ -69,7 +69,7 @@ CODEX_HOME=/data/codex-home codex login --device-auth
 
 **Claude Code 登录：**
 ```bash
-docker exec -it vibe-research claude
+docker exec -e CLAUDE_CONFIG_DIR=/data/claude-home -it vibe-research claude
 # 在 Claude Code 交互界面中执行 /login 完成授权
 ```
 

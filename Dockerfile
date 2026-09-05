@@ -59,6 +59,7 @@ RUN node --experimental-strip-types orchestrator/src/init.ts --python /app/.venv
 RUN mkdir -p /data
 ENV VRA_DATA_ROOT=/data
 ENV VRA_PYTHON=/app/.venv/bin/python
+ENV CLAUDE_CONFIG_DIR=/data/claude-home
 
 EXPOSE 80
 
