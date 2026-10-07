@@ -8,24 +8,7 @@ import { apiTokenPath } from "./vite-token";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..");
-
-/**
- * LAN 访问开关（默认关 = 纯 localhost，与本机桌面用法完全一致）。
- *
- * 设为 1 时，`npm run dev` 可被局域网设备通过本机 IP 访问（如 http://192.168.x.x:5930）：
- *   VRA_LAN=1 npm run dev
- *
- * 为什么需要两处改动：
- *   1. host 绑 0.0.0.0 —— 否则只有回环接口在监听；
- *   2. 代理把 Origin 归一化为回环 —— 后端 crossSiteReject 只认本机 Origin（CSRF 防护），
- *      而 LAN 客户端的浏览器带的是 http://192.168.x.x:5930，POST 全被 403。
- *      代理本身是本机进程（浏览器→vite 这一跳已由 vite host 控制），它到 loopback 后端
- *      的那一跳用本机身份转发，正是它的角色；changeOrigin 只重写 Host 不重写 Origin，
- *      故必须显式归一化。
- * 安全前提：非回环绑定的 API 端（--host 0.0.0.0）本就强制 VRA_API_TOKEN（见 api.ts），
- * Bearer token 只存在于 vite 进程、不进浏览器 —— 与回环模式同一把钥匙，只是多了一个
- * 由本机代理把关的入口。
- */
+// 上游 #34：仅用户显式开启时监听所有网卡；这不是多用户登录或公网部署方案。
 const lan = process.env.VRA_LAN === "1";
 
 /**
@@ -49,15 +32,35 @@ function apiToken(): string {
 }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), {
+    name: "vra-lan-origin-guard",
+    configureServer(server) {
+      if (!lan) return;
+      // 在 Vite 代理（自动附加后端 token）之前拒绝跨站浏览器请求。
+      // 不能无条件改 Origin：非安全 HTTP 上浏览器可能不发送 Sec-Fetch-Site。
+      server.middlewares.use((req, res, next) => {
+        const origin = req.headers.origin;
+        const site = req.headers["sec-fetch-site"];
+        const sameOrigin = `${server.config.server.https ? "https" : "http"}://${req.headers.host}`;
+        if ((origin !== undefined && origin !== sameOrigin)
+          || (site !== undefined && site !== "same-origin" && site !== "none")) {
+          res.writeHead(403, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ error: "forbidden_origin", message: "请从工作台自身页面发起请求。" }));
+          return;
+        }
+        next();
+      });
+    },
+  }],
   // 🔴 `@` 指向**垂类包**而不是 src:上游 UI 里写的是 `@/components`、`@/lib`、`@/data`,
   //    我们把它整套放进 verticals/finance/,别名这么指,上游代码一行都不用改。
   resolve: { alias: { "@": path.resolve(here, "src/verticals/finance") } },
   server: {
-    // 🔴 默认写死 IPv4:localhost 在本机可能解析成 [::1],而后端绑的是 127.0.0.1,对不上会 502。
-    // LAN 模式(VRA_LAN=1)放开 0.0.0.0,让局域网设备能访问(见文件头说明)。
+    // 🔴 必须写死 IPv4:默认 localhost 在本机解析成 [::1],而后端绑的是 127.0.0.1,对不上会 502
     host: lan ? "0.0.0.0" : "127.0.0.1",
     port: 5930,
+    // 启动器和 README 都只打开 5930；被占用时必须明确失败，不能静默漂到 5931 让用户看到旧页面。
+    strictPort: true,
     proxy: {
       "/api": {
         target: "http://127.0.0.1:8765",
@@ -65,17 +68,16 @@ export default defineConfig({
         rewrite: (p) => p.replace(/^\/api/, ""),
         configure(proxy) {
           proxy.on("proxyReq", (proxyReq) => {
-            // 后端 crossSiteReject 只接受本机 Origin;浏览器带的是 127.0.0.1:5930,本机、放行。
-            // LAN 模式下浏览器 Origin 是 http://192.168.x.x:5930,会被 403 ——
-            // 由本机代理把它归一化为回环身份(见文件头安全说明)。
+            // LAN 请求已经通过前置同源检查，此处才归一化为后端认可的回环 Origin。
             if (lan) proxyReq.setHeader("origin", "http://127.0.0.1:5930");
             const token = apiToken();
             if (token) proxyReq.setHeader("Authorization", `Bearer ${token}`);
+            // 后端 crossSiteReject 只接受本机 Origin;浏览器带的是 127.0.0.1:5930,本机、放行。
           });
           proxy.on("error", (err, _req, res) => {
             // 默认错误页是一段 HTML,前端 res.json() 会炸在"Unexpected token <",把真正原因埋掉
             const msg = /ECONNREFUSED/.test(String(err))
-              ? "编排器 API 没在跑:先执行 node orchestrator/src/api.ts"
+              ? "本机服务没有启动或已经关闭。请按页面提示重新启动。"
               : `代理失败:${err.message}`;
             if ("writeHead" in res && !res.headersSent) {
               res.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
